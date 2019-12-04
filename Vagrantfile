@@ -9,9 +9,9 @@
 ##############################################################################
 
 $no_proxy = ENV['NO_PROXY'] || ENV['no_proxy'] || "127.0.0.1,localhost"
-# NOTE: This range is based on vagrant-libvirt network definition CIDR 192.168.121.0/24
-(1..254).each do |i|
-  $no_proxy += ",192.168.121.#{i}"
+# NOTE: This range is based on demo-mgmt-net network definition CIDR 192.168.126.0/30
+(1..4).each do |i|
+  $no_proxy += ",192.168.126.#{i}"
 end
 $no_proxy += ",10.0.2.15"
 
@@ -20,7 +20,8 @@ Vagrant.configure("2") do |config|
   config.vm.provider :virtualbox
 
   config.vm.box = "elastic/ubuntu-16.04-x86_64"
-  config.vm.hostname = "virtlet-worker01"
+  config.vm.hostname = "k8s"
+  config.vm.network :forwarded_port, guest: 9090, host: 9090 # Cockpit Web UI
   config.vm.provision 'shell', privileged: false do |sh|
     sh.inline = <<-SHELL
       cd /vagrant/
@@ -30,8 +31,8 @@ Vagrant.configure("2") do |config|
 
   [:virtualbox, :libvirt].each do |provider|
   config.vm.provider provider do |p, override|
-      p.cpus = 8
-      p.memory = 32768
+      p.cpus = 4
+      p.memory = 16384
     end
   end
 
@@ -39,7 +40,8 @@ Vagrant.configure("2") do |config|
     v.cpu_mode = 'host-passthrough'
     v.random_hostname = true
     v.nested = true
-    v.management_network_address = "192.168.121.0/24"
+    v.management_network_name = "demo-mgmt-net"
+    v.management_network_address = "192.168.126.0/30"
   end
 
   if ENV['http_proxy'] != nil and ENV['https_proxy'] != nil

@@ -66,7 +66,7 @@ metadata:
       $proxy
       runcmd:
       $cloud_init_proxy
-        - curl -fsSL http://bit.ly/pkgInstall | PKG=stress PKG_UDPATE=true bash
+        - curl -fsSL http://bit.ly/install_pkg | PKG=stress PKG_UDPATE=true bash
         - echo "Starting stress jobs"
         - until false; do echo "\$(date +%H:%M:%S) - Starting stress job..."; sudo stress --cpu 10 --timeout 590; echo "\$(date +%H:%M:%S) - Completed stress job"; sleep 10; done
 spec:

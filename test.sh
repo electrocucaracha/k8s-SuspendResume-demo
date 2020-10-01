@@ -16,7 +16,7 @@ source common.sh
 
 function _test_burstable {
     msg "=== Test Virtlet VM with Burstable QoS class ==="
-    _setup ""
+    _setup
 
     _trigger_cpu_stress_pod
     # NOTE: VM running + Pod running
@@ -38,14 +38,14 @@ function _test_burstable {
 
 function _test_guaranteed {
     msg "=== Test Virtlet VM with Guaranteed QoS class ==="
-    _setup 2
+    _setup 1
 
     msg "Creating cpu stress pod"
     kubectl apply -f linux_pod.yaml --force > /dev/null
     # NOTE: VM running + Pod pending
     sleep 5
     printf "\nLinux job events:\n"
-    kubectl get event --field-selector involvedObject.name=linux-job --sort-by='.lastTimestamp'
+    kubectl get event --field-selector involvedObject.name=linux-job
 
     kubectl delete pod "$virtlet_pod_name" > /dev/null
     msg "Destroying VM..."
@@ -66,14 +66,10 @@ function _test_guaranteed {
     _teardown
 }
 
-# main() - Base testing setup shared among functional tests
-function main {
-    _teardown
+_teardown
 
-    _test_burstable
-    _test_guaranteed
+for test_case in ${TEST_CASES:-burstable guaranteed}; do
+    "_test_$test_case"
+done
 
-    printf "\nTests completed!!!\n"
-}
-
-main
+printf "\nTests completed!!!\n"

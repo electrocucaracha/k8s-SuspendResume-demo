@@ -38,17 +38,14 @@ function _create_yaml_files {
         - export no_proxy=$NO_PROXY
         - export NO_PROXY=$NO_PROXY"
     fi
-    cat << DEPLOYMENT > "$virtlet_pod_name.yaml"
+    cat << EOF > "$virtlet_pod_name.yaml"
 apiVersion: v1
 kind: Pod
 metadata:
   name: $virtlet_pod_name
   annotations:
-    # This tells CRI Proxy that this pod belongs to Virtlet runtime
     kubernetes.io/target-runtime: virtlet.cloud
-    # Specifies the virtual CPUs count.
-    VirtletVCPUCount: "${1:-4}"
-    # Set to directly use cpu definition of libvirt
+    VirtletVCPUCount: "${1:-1}"
     VirtletLibvirtCPUSetting: |
       mode: host-passthrough
     VirtletCloudInitUserData: |
@@ -61,7 +58,7 @@ metadata:
         lock_passwd: false
         shell: /bin/bash
         # the password is "demo"
-        passwd: "$(mkpasswd --method=SHA-512 --rounds=4096 demo)"
+        passwd: $(mkpasswd --method=SHA-512 --rounds=4096 demo)
         sudo: ALL=(ALL) NOPASSWD:ALL
       $proxy
       runcmd:
@@ -70,29 +67,25 @@ metadata:
         - echo "Starting stress jobs"
         - until false; do echo "\$(date +%H:%M:%S) - Starting stress job..."; sudo stress --cpu 10 --timeout 590; echo "\$(date +%H:%M:%S) - Completed stress job"; sleep 10; done
 spec:
-  # This nodeSelector specification tells Kubernetes to run this
-  # pod only on the nodes that have extraRuntime=virtlet label.
-  # This label is used by Virtlet DaemonSet to select nodes
-  # that must have Virtlet runtime
   nodeSelector:
     extraRuntime: virtlet
   containers:
   - name: vm-worker
-    # This specifies the image to use.
-    # virtlet.cloud/ prefix is used by CRI proxy, the remaining part
-    # of the image name is prepended with https:// and used to download the image
     image: virtlet.cloud/ubuntu/18.04
     imagePullPolicy: IfNotPresent
     # tty and stdin required for "kubectl attach -t" to work
     tty: true
     stdin: true
     resources:
-      limits:
-        # This memory limit is applied to the libvirt domain definition
+      requests:
         memory: 2Gi
-DEPLOYMENT
-    if [[ -n "${1}" ]]; then
-        echo "        cpu: $1" >> "$virtlet_pod_name.yaml"
+EOF
+    if [ "${1:-}" ]; then
+        cat << EOF >> "$virtlet_pod_name.yaml"
+      limits:
+        cpu: ${1:-1}
+        memory: 2Gi
+EOF
     fi
 }
 
@@ -105,10 +98,8 @@ function msg {
 function _create_vm {
     kubectl create -f "$virtlet_pod_name.yaml" > /dev/null
     msg "Waiting for Virtlet VM to start..."
-    until kubectl get pod "$virtlet_pod_name" -o 'jsonpath={.status.phase}'  | grep "Running" > /dev/null ; do
-        printf "."
-        sleep 2
-    done
+    kubectl wait --for=condition=ready pods "$virtlet_pod_name" --timeout=5m
+    msg "$virtlet_pod_name $(kubectl describe pod virtlet-job | grep "QoS Class:")"
 
     vm_status=$(kubectl virt virsh list | grep "virtlet-.*-vm-worker" | awk '{print $3}')
     if [[ "$vm_status" != "running" ]]; then
@@ -117,7 +108,7 @@ function _create_vm {
     fi
     msg "Virsh domain: $(_get_vm_name)"
     msg "Waiting for Cloud Init service to install stress tools..."
-    until kubectl logs "$virtlet_pod_name" | grep "Starting stress jobs" > /dev/null ; do
+    until kubectl logs "$virtlet_pod_name" | grep -q "Starting stress jobs"; do
         printf "."
         sleep 2
     done
@@ -162,10 +153,7 @@ function _trigger_cpu_stress_pod {
     msg "Creating cpu stress pod"
     kubectl apply -f linux_pod.yaml --force > /dev/null
     msg "Waiting for linux-job to start..."
-    until kubectl get pod linux-job -o 'jsonpath={.status.phase}'  | grep "Running" > /dev/null ; do
-        printf "."
-        sleep 2
-    done
+    kubectl wait --for=condition=ready pods linux-job --timeout=5m
     _print_node__resources
     _print_cpu_usage 6
     msg "Destroying cpu stress pod"
@@ -175,7 +163,7 @@ function _trigger_cpu_stress_pod {
 # _setup() - Creates testing resources
 function _setup {
     pushd "$(mktemp -d)" > /dev/null
-    _create_yaml_files "$1"
+    eval "_create_yaml_files ${1:-}"
     _create_vm
     popd > /dev/null
 
@@ -186,10 +174,5 @@ function _setup {
 # _teardown() - Destroys testing resources
 function _teardown {
     kubectl delete events --field-selector involvedObject.name=linux-job > /dev/null
-    kubectl delete -f linux_pod.yaml --ignore-not-found=true --now > /dev/null
-    kubectl delete pod "$virtlet_pod_name" --now --ignore-not-found=true --now > /dev/null
-    until kubectl get pods --ignore-not-found --no-headers > /dev/null; do
-        msg "Destroying pods"
-        sleep 2
-    done
+    kubectl delete pods --all --timeout=5m > /dev/null
 }

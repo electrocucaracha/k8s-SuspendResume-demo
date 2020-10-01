@@ -1,5 +1,6 @@
 # Quality of Service classes (Demo)
 [![Build Status](https://travis-ci.org/electrocucaracha/k8s-SuspendResume-demo.png)](https://travis-ci.org/electrocucaracha/k8s-SuspendResume-demo)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 This project was created to understand how supend and resume Libvirt
 actions impact different Kubernetes Quality of Service (QoS) classes.
@@ -81,10 +82,6 @@ following instruction:
 Vagrant will provision an All-in-One Kubernetes cluster using the
 [Kubespray tool][4] and configure/install [Virtlet][1] and
 [CRI Proxy][2].
-
-## License
-
-Apache-2.0
 
 [1]: https://github.com/Mirantis/virtlet
 [2]: https://www.vagrantup.com/

@@ -12,14 +12,15 @@ set -o pipefail
 set -o errexit
 set -o nounset
 
+export KRD_CERT_MANAGER_ENABLED=false
+export KRD_INGRESS_NGINX_ENABLED=false
 export KRD_ADDONS=virtlet
-export KRD_ENABLE_MULTUS=false
-KRD_ACTIONS=("install_k8s" "install_k8s_addons")
-curl -fsSL http://bit.ly/KRDaio | KRD_ACTIONS_DECLARE=$(declare -p KRD_ACTIONS) bash
 
-printf "Waiting for Virtlet services..."
-until kubectl get pods -n kube-system | grep "virtlet-.*Running"; do
-    printf "."
-    sleep 2
-done
-./test.sh | tee ~/test.log
+curl -fsSL http://bit.ly/KRDaio | bash
+pushd /opt/krd
+./krd_command.sh -a install_k8s_addons
+popd
+kubectl rollout status daemonset.apps/virtlet -n kube-system --timeout=5m
+if ! command -v mkpasswd; then
+    curl -fsSL http://bit.ly/install_pkg | PKG=whois bash
+fi

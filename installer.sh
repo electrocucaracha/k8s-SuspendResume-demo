@@ -15,7 +15,7 @@ set -o nounset
 export KRD_CERT_MANAGER_ENABLED=false
 export KRD_INGRESS_NGINX_ENABLED=false
 export KRD_KUBE_VERSION=v1.18.10
-export KRD_ADDONS=virtlet
+export KRD_ADDONS_LIST=virtlet
 export KRD_ACTIONS_LIST="install_k8s,install_k8s_addons"
 
 curl -fsSL http://bit.ly/KRDaio | bash
